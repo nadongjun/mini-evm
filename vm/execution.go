@@ -6,11 +6,12 @@ import (
 
 // Execution layer
 type ExecutionContext struct {
-	code    []byte
-	stack   Stack
-	memory  Memory
-	pc      int
-	stopped bool
+	code       []byte
+	stack      Stack
+	memory     Memory
+	pc         int
+	stopped    bool
+	returndata []int
 }
 
 // Evm instruction
@@ -23,10 +24,29 @@ type Instruction struct {
 var Instructions []Instruction
 var InstructionsByOpcode = make(map[int]Instruction)
 var (
-	STOP  = RegisterInstruction(0x00, "STOP", func(ctx *ExecutionContext) { ctx.Stop() })
-	PUSH1 = RegisterInstruction(0x60, "PUSH1", func(ctx *ExecutionContext) { ctx.stack.push(ctx.ReadCode(1)) })
-	ADD   = RegisterInstruction(0x01, "ADD", func(ctx *ExecutionContext) { ctx.stack.push((ctx.stack.pop() + ctx.stack.pop()) % 256) })
-	MUL   = RegisterInstruction(0x02, "MUL", func(ctx *ExecutionContext) { ctx.stack.push((ctx.stack.pop() * ctx.stack.pop()) % 256) })
+	STOP    = RegisterInstruction(0x00, "STOP", func(ctx *ExecutionContext) { ctx.Stop() })
+	PUSH1   = RegisterInstruction(0x60, "PUSH1", func(ctx *ExecutionContext) { ctx.stack.push(ctx.ReadCode(1)) })
+	ADD     = RegisterInstruction(0x01, "ADD", func(ctx *ExecutionContext) { ctx.stack.push((ctx.stack.pop() + ctx.stack.pop()) % 256) })
+	MUL     = RegisterInstruction(0x02, "MUL", func(ctx *ExecutionContext) { ctx.stack.push((ctx.stack.pop() * ctx.stack.pop()) % 256) })
+	MSTORE8 = RegisterInstruction(
+		0x53,
+		"MSTORE8",
+		func(ctx *ExecutionContext) {
+			address := ctx.stack.pop()
+			value := ctx.stack.pop() % 256
+
+			ctx.memory.Store(address, value)
+		},
+	)
+	RETURN = RegisterInstruction(
+		0xf3,
+		"RETURN",
+		func(ctx *ExecutionContext) {
+			dataSize := ctx.stack.pop()
+			dataOffset := ctx.stack.pop()
+			ctx.SetReturnData(dataOffset, dataSize)
+		},
+	)
 )
 
 func NewExecutionContext(code []byte, pc int, stack Stack, memory Memory) *ExecutionContext {
@@ -49,6 +69,11 @@ func (exe *ExecutionContext) ReadCode(numBytes int) int {
 	exe.pc += numBytes
 
 	return value
+}
+
+func (exe *ExecutionContext) SetReturnData(offset, length int) {
+	exe.stopped = true
+	exe.returndata = exe.memory.LoadRange(offset, length)
 }
 
 func RegisterInstruction(opcode int, name string, executeFunc func(*ExecutionContext)) *Instruction {
@@ -81,10 +106,8 @@ func DecodeOpcode(context *ExecutionContext) (Instruction, error) {
 func Run(code []byte) {
 	// Executes code in a fresh context.
 	context := NewExecutionContext(code, 0, Stack{}, Memory{})
-	//context := ExecutionContext{code: code}
 
 	for !context.stopped {
-		//pcBefore := context.pc
 		instruction, err := DecodeOpcode(context)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
@@ -93,8 +116,11 @@ func Run(code []byte) {
 
 		instruction.execute(context)
 
-		//fmt.Printf("%v @ pc=%v\n", instruction, pcBefore)
-		fmt.Println(*context)
+		fmt.Println("pc", context.pc)
+		fmt.Println("stack", context.stack.stack)
+		fmt.Println("memeory", context.memory.memory)
 		fmt.Println()
 	}
+	fmt.Println("return data= ", context.returndata)
+
 }

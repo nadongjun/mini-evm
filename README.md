@@ -16,7 +16,7 @@ To get started with the project, follow these steps:
 3. Build and run the project: `go run main.go --bytecode`
 
 `Example
-go run main.go 600660070200`
+go run main.go 600660070260005360016000f3`
 ## Project Structure
 
 @TO-DO
