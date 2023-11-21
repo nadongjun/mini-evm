@@ -47,6 +47,30 @@ var (
 			ctx.SetReturnData(dataOffset, dataSize)
 		},
 	)
+	JUMP = RegisterInstruction(
+		0x56,
+		"JUMP",
+		func(ctx *ExecutionContext) {
+			ctx.SetProgramCounter(ctx.stack.pop())
+		},
+	)
+	JUMPI = RegisterInstruction(
+		0x57,
+		"JUMPI",
+		func(ctx *ExecutionContext) {
+			target_pc, cond := ctx.stack.pop(), ctx.stack.pop()
+			if cond != 0 {
+				ctx.SetProgramCounter(target_pc)
+			}
+		},
+	)
+	PC = RegisterInstruction(
+		0x58,
+		"PC",
+		func(ctx *ExecutionContext) {
+			ctx.stack.push(ctx.pc)
+		},
+	)
 )
 
 func NewExecutionContext(code []byte, pc int, stack Stack, memory Memory) *ExecutionContext {
@@ -74,6 +98,10 @@ func (exe *ExecutionContext) ReadCode(numBytes int) int {
 func (exe *ExecutionContext) SetReturnData(offset, length int) {
 	exe.stopped = true
 	exe.returndata = exe.memory.LoadRange(offset, length)
+}
+
+func (exe *ExecutionContext) SetProgramCounter(pc int) {
+	exe.pc = pc
 }
 
 func RegisterInstruction(opcode int, name string, executeFunc func(*ExecutionContext)) *Instruction {
