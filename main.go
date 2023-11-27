@@ -15,5 +15,5 @@ func main() {
 		fmt.Printf("Error decoding hex data: %v\n", err)
 		os.Exit(1)
 	}
-	vm.Run(data)
+	fmt.Println(vm.Run(data))
 }

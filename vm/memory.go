@@ -23,7 +23,7 @@ func (mem *Memory) LoadRange(length int, offset int) []int {
 	}
 	data := make([]int, length)
 	for i := 0; i < length; i++ {
-		data[i] = mem.Load(offset + i)
+		data[i] = mem.Load(offset + i) // [1, 2, 3, 4]
 	}
 	return data
 }

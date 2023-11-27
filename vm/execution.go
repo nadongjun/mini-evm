@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"encoding/binary"
 	"fmt"
 )
 
@@ -24,10 +25,19 @@ type Instruction struct {
 var Instructions []Instruction
 var InstructionsByOpcode = make(map[int]Instruction)
 var (
-	STOP    = RegisterInstruction(0x00, "STOP", func(ctx *ExecutionContext) { ctx.Stop() })
-	PUSH1   = RegisterInstruction(0x60, "PUSH1", func(ctx *ExecutionContext) { ctx.stack.push(ctx.ReadCode(1)) })
-	ADD     = RegisterInstruction(0x01, "ADD", func(ctx *ExecutionContext) { ctx.stack.push((ctx.stack.pop() + ctx.stack.pop()) % 256) })
-	MUL     = RegisterInstruction(0x02, "MUL", func(ctx *ExecutionContext) { ctx.stack.push((ctx.stack.pop() * ctx.stack.pop()) % 256) })
+	STOP  = RegisterInstruction(0x00, "STOP", func(ctx *ExecutionContext) { ctx.Stop() })
+	PUSH1 = RegisterInstruction(0x60, "PUSH1", func(ctx *ExecutionContext) { ctx.stack.push(ctx.ReadCode(1)) })
+	ADD   = RegisterInstruction(0x01, "ADD", func(ctx *ExecutionContext) { ctx.stack.push((ctx.stack.pop() + ctx.stack.pop()) % 256) })
+	MUL   = RegisterInstruction(0x02, "MUL", func(ctx *ExecutionContext) { ctx.stack.push((ctx.stack.pop() * ctx.stack.pop()) % 256) })
+	MLOAD = RegisterInstruction(
+		0x51,
+		"MLOAD",
+		func(ctx *ExecutionContext) {
+			temp := intsToBytes(ctx.memory.LoadRange(ctx.stack.pop(), 32))
+			// Word to int
+			ctx.stack.push(int(binary.BigEndian.Uint64(temp)))
+		},
+	)
 	MSTORE8 = RegisterInstruction(
 		0x53,
 		"MSTORE8",
@@ -131,7 +141,7 @@ func DecodeOpcode(context *ExecutionContext) (Instruction, error) {
 	return instruction, nil
 }
 
-func Run(code []byte) {
+func Run(code []byte) int {
 	// Executes code in a fresh context.
 	context := NewExecutionContext(code, 0, Stack{}, Memory{})
 
@@ -139,7 +149,6 @@ func Run(code []byte) {
 		instruction, err := DecodeOpcode(context)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
-			return
 		}
 
 		instruction.execute(context)
@@ -149,6 +158,18 @@ func Run(code []byte) {
 		fmt.Println("memeory", context.memory.memory)
 		fmt.Println()
 	}
-	fmt.Println("return data= ", context.returndata)
+	fmt.Println("return data= ", context.returndata[0])
+	return context.returndata[0]
+}
 
+// Util
+// [1, 2, 3, 4] -> []byte
+func intsToBytes(ints []int) []byte {
+	byteSlice := make([]byte, len(ints)*4)
+
+	for i, v := range ints {
+		binary.BigEndian.PutUint32(byteSlice[i*4:], uint32(v))
+	}
+
+	return byteSlice
 }
